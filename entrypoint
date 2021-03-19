@@ -33,7 +33,7 @@ update (){
 }
 
 build (){
-	if fx set --dir out/"${NAME:-"${PRODUCT:-workstation}"}" "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}" &> /dev/null; then
+	if fx --dir out/"${NAME:-"${PRODUCT:-workstation}"}" set "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}" &> /dev/null; then
 		fx metrics "${FX_METRICS:-disable}"
 		fx build
 		exit
