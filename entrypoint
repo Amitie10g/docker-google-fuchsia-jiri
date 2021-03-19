@@ -1,0 +1,158 @@
+#!/bin/bash
+
+while getopts p:b:u:m:i:t:r: option
+do
+	case "${option}"
+	in
+		p) export PRODUCT="${OPTARG}";;
+		b) export BOARD="${OPTARG}";;
+		u) export BUNDLE="${OPTARG}";;
+		m) export FX_METRICS="${OPTARG}";;
+		i) export DISK_IMG="${OPTARG}";;
+		t) export TARGET_DEVICE="${OPTARG}";;
+		r) export FUCHSIA_ROOT="${OPTARG}";;
+	esac
+done
+
+
+jiri_init (){
+	jiri init -analytics-opt=false "${FUCHSIA_ROOT:-$PWD}"
+	jiri import -name=integration flower https://fuchsia.googlesource.com/integration
+	export PATH="${FUCHSIA_ROOT:-$PWD}/.jiri_root/bin":$PATH
+}
+
+update (){
+	if [[ -f "${FUCHSIA_ROOT:-$PWD}/creds.json" ]]; then
+		mkdir -p /root/.config/chrome_infra/auth
+		cp "${FUCHSIA_ROOT:-$PWD}/creds.json" /root/.config/chrome_infra/auth/creds.json
+	else
+		cipd auth-login
+	fi
+
+	jiri update
+}
+
+build (){
+	if fx set --dir out/"${NAME:-"${PRODUCT:-workstation}"}" "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}" &> /dev/null; then
+		fx metrics "${FX_METRICS:-disable}"
+		fx build
+		exit
+	else
+		update
+		build
+	fi
+}
+
+flash_zedboot (){
+	# Try to create a loop device, if allowed (/dev/fuchsia by default)
+	if [[ -f "${DISK_IMG:-/fuchsia/disk.img}" ]]; then
+		if mknod -m 0660 /dev/fuchsia b 7 8 &> /dev/null; then
+			if losetup /dev/fuchsia "${DISK_IMG}" &> /dev/null; then
+				TARGET_DEVICE=/dev/fuchsia
+			fi
+		else
+			TARGET_DEVICE="${DISK_IMG}"
+		fi
+	fi
+
+	if [[ -f "${TARGET_DEVICE}" ]]; then
+		fx mkzedboot -f "${TARGET_DEVICE}"
+	fi
+
+	exit
+}
+
+flash_installer (){
+	if [[ -f "${TARGET_DEVICE}" ]]; then
+		fx mkinstaller -f "${TARGET_DEVICE}"
+	fi
+
+	exit
+}
+
+deploy (){
+	pause "Please boot the target device in order to update it over the network, then press a key to continue."
+	fx pave
+}
+
+femu (){
+	if ! fx vdl start --host-gpu -N -u "${FUCHSIA_ROOT:-$PWD}/scripts/start-unsecure-internet.sh"; then
+		femu-headless
+	fi
+}
+
+femu-headless (){
+	fx vdl start --headless
+}
+
+# First, initialize
+jiri_init
+"${FUCHSIA_ROOT:-$PWD}/tools/ssh-keys/gen-ssh-keys.sh"
+
+# Copy entrypoint to Fuchsia root dir
+if [[ ! -f "${FUCHSIA_ROOT:-$PWD}/entrypoint" ]] && [[ -f /usr/local/bin/entrypoint ]]; then
+	cp /usr/local/bin/entrypoint "${FUCHSIA_ROOT:-$PWD}/entrypoint"
+fi
+
+case $1 in
+	update)
+		update
+	;;
+	
+	build)
+		build
+	;;
+	
+	flash|mkzedboot)
+		flash_zedboot
+		deploy
+	;;
+
+	flash_installer|mkinstaller)
+		flash_installer
+	;;
+
+	femu)
+		femu
+	;;
+
+	femu-headless)
+		femu-headless
+	;;
+	
+	help)
+		echo -e "\e[1mUsage\e[0m\n" \
+				"\e[1mInteractive shell:\e[0m	docker run -it --user 1000:1000 -v <host-side dir>:/fuchsia amitie10g/google-fuchsia-jiri bash\n"
+		
+		echo -e	"\e[1mBuilding\e[0m\n" \
+				"\e[1mDownload/update:\e[0m	docker run --user 1000:1000 -v <fuchsia source tree>:/fuchsia amitie10g/google-fuchsia-jiri update\n" \
+				"\e[1mBuild:\e[0m			docker run --user 1000:1000 -v <fuchsia source tree>:/fuchsia amitie10g/google-fuchsia-jiri build\n\n" \
+				"Before downloading, be sure to expose the volume to the right host-side location.\n"
+		
+		echo -e	"\e[1mFlashing\e[0m\n" \
+				"\e[1mFlash zedboot:\e[0m		docker run --privileged --user 1000:1000 -v <fuchsia source tree>:/fuchsia amitie10g/google-fuchsia-jiri mkzedboot\n" \
+				"\e[1mFlash installer:\e[0m	docker run --privileged --user 1000:1000 -v <fuchsia source tree>:/fuchsia amitie10g/google-fuchsia-jiri mkinstaller\n\n" \
+				"Before installing into a device, be sure to have it exposed it to the container;\n" \
+				"otherwise, you may use a disk image at the host-side, or use a physical USB drive.\n" \
+				"mkinstaller only works with a physical USB drive as target; using other block devices will fail.\n" \
+
+		
+		echo -e	"\e[1mTo create an 8 GB zero-filled file as following:\e[0m\n" \
+				"\e[1mIn Windows:\e[0m	fsutil file createnew disk.img 8589934592\n" \
+				"\e[1mIn Linux:\e[0m	dd if=/dev/zero of=disk.img bs=4096 count=2097152\n\n" \
+				"Then, you may clone the disk image into your USB drive.\n"
+
+		echo -e	"It is highly recommended to run in privileged mode (\e[1m--privileged\e[0m) in order to access your block devices properly;"
+		echo -e	"otherwise, run at the host side (once \$PATH is set properly).\n"
+
+		echo -e	"Visit \e[1mhttps://fuchsia.dev/fuchsia-src/get-started\e[0m for more information."
+	;;
+	
+	shell|bash)
+		bash --login -c 'bash --rcfile /etc/skel/.bashrc'
+	;;
+
+	*)
+		$1
+	;;
+esac
