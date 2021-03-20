@@ -134,7 +134,7 @@ case $1 in
 				"\e[1mFlash installer:\e[0m	docker run --privileged --user 1000:1000 -v <fuchsia source tree>:/fuchsia amitie10g/google-fuchsia-jiri mkinstaller\n\n" \
 				"Before installing into a device, be sure to have it exposed it to the container;\n" \
 				"otherwise, you may use a disk image at the host-side, or use a physical USB drive.\n" \
-				"mkinstaller only works with a physical USB drive as target; using other block devices will fail.\n" \
+				"mkinstaller only works with a physical USB drive as target; using other block devices will fail.\n"
 
 		
 		echo -e	"\e[1mTo create an 8 GB zero-filled file as following:\e[0m\n" \
