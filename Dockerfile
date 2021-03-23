@@ -24,7 +24,7 @@ RUN apt-get update && \
 ENV PRODUCT="workstation" \
     BOARD="x64" \
     BUNDLE="//bundles:tools" \
-    FUCHSIA_DIR="fuchsia" \
+    FUCHSIA_ROOT="/fuchsia" \
     DEBUG="false"
 
 # Copy the entrypoint script

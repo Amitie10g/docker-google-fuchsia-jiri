@@ -16,16 +16,13 @@ done
 
 
 jiri_init (){
+	export PATH="${FUCHSIA_ROOT:-$PWD}/.jiri_root/bin":$PATH
 	jiri init -analytics-opt=false "${FUCHSIA_ROOT:-$PWD}"
 	jiri import -name=integration flower https://fuchsia.googlesource.com/integration
-	export PATH="${FUCHSIA_ROOT:-$PWD}/.jiri_root/bin":$PATH
 }
 
 update (){
-	if [[ -f "${FUCHSIA_ROOT:-$PWD}/creds.json" ]]; then
-		mkdir -p /root/.config/chrome_infra/auth
-		cp "${FUCHSIA_ROOT:-$PWD}/creds.json" /root/.config/chrome_infra/auth/creds.json
-	else
+	if [[ ! -f "${FUCHSIA_ROOT:-$PWD}/creds.json" ]]; then
 		cipd auth-login
 	fi
 
@@ -33,10 +30,9 @@ update (){
 }
 
 build (){
-	if fx --dir out/"${NAME:-"${PRODUCT:-workstation}"}" set "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}" &> /dev/null; then
+	if fx --dir "${FUCHSIA_ROOT:-$PWD}/out/${NAME:-"${PRODUCT:-workstation}"}" set "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}" &> /dev/null; then
 		fx metrics "${FX_METRICS:-disable}"
-		fx build
-		exit
+		fx build --log build.log
 	else
 		update
 		build
@@ -51,23 +47,19 @@ flash_zedboot (){
 				TARGET_DEVICE=/dev/fuchsia
 			fi
 		else
-			TARGET_DEVICE="${DISK_IMG}"
+			TARGET_DEVICE="${DISK_IMG:-/fuchsia/disk.img}"
 		fi
 	fi
 
 	if [[ -f "${TARGET_DEVICE}" ]]; then
 		fx mkzedboot -f "${TARGET_DEVICE}"
 	fi
-
-	exit
 }
 
 flash_installer (){
 	if [[ -f "${TARGET_DEVICE}" ]]; then
 		fx mkinstaller -f "${TARGET_DEVICE}"
 	fi
-
-	exit
 }
 
 deploy (){
@@ -120,7 +112,7 @@ case $1 in
 		femu-headless
 	;;
 	
-	help)
+	help|'')
 		echo -e "\e[1mUsage\e[0m\n" \
 				"\e[1mInteractive shell:\e[0m	docker run -it --user 1000:1000 -v <host-side dir>:/fuchsia amitie10g/google-fuchsia-jiri bash\n"
 		
