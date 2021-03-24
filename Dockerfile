@@ -10,7 +10,9 @@ RUN apt-get update && \
         ccache \
         binutils \
 		openssh-client \
-        eject && \
+        eject \
+        python3 \
+        sudo && \
     apt-get clean && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
