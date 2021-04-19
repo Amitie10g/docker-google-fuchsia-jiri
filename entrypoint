@@ -22,17 +22,22 @@ jiri_init (){
 }
 
 update (){
-	if [[ ! -f "${FUCHSIA_ROOT:-$PWD}/creds.json" ]]; then
+	if [[ ! -f "${FUCHSIA_ROOT:-$PWD}/.config/chrome_infra/auth/creds.json" ]]; then
 		cipd auth-login
 	fi
 
 	jiri update
 }
 
+prebuild (){
+	if [[ "${PREBUILD:-false}" == true ]]; then
+		fx --dir out/"${NAME:-"${PRODUCT:-workstation}"}" set "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}"
+	fi
+}
+
 build (){
-	if fx --dir "${FUCHSIA_ROOT:-$PWD}/out/${NAME:-"${PRODUCT:-workstation}"}" set "${PRODUCT:-workstation}"."${BOARD:-x64}" --with "${BUNDLE:-//bundles:tools}" --ccache --netboot --args=is_debug="${DEBUG:-false}" &> /dev/null; then
-		fx metrics "${FX_METRICS:-disable}"
-		fx build --log build.log
+	if fx metrics "${FX_METRICS:-disable}"; then
+		fx build --log "build.log.$(date +'%Y%m%d')$((1 + $RANDOM % 999))"
 	else
 		update
 		build
@@ -92,6 +97,7 @@ case $1 in
 	;;
 	
 	build)
+		prebuild
 		build
 	;;
 	
@@ -141,7 +147,7 @@ case $1 in
 	;;
 	
 	shell|bash)
-		bash --login -c 'bash --rcfile /etc/skel/.bashrc'
+		bash -c 'bash --rcfile /etc/skel/.bashrc'
 	;;
 
 	*)
