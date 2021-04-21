@@ -1,4 +1,4 @@
-FROM debian:testing-slim AS base
+FROM ubuntu:focal AS base
 
 # Set default environment variables
 ENV PRODUCT=workstation \
@@ -20,7 +20,8 @@ RUN apt-get update && \
         openssh-client \
         eject \
         python3 \
-        sudo && \
+        sudo \
+        uuid-runtime && \
     apt-get clean && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
@@ -37,5 +38,6 @@ RUN bash -o pipefail -c "curl -s 'https://fuchsia.googlesource.com/jiri/+/HEAD/s
 
 # Default command line: interactive shell
 WORKDIR /fuchsia
+USER 1000:1000
 ENTRYPOINT ["entrypoint"]
 CMD ["shell"]
