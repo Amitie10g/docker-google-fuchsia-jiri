@@ -37,7 +37,7 @@ prebuild (){
 
 build (){
 	if fx metrics "${FX_METRICS:-disable}"; then
-		fx build -j 8 -k 0 --log "build.log.$(date +'%Y%m%d')$((1 + $RANDOM % 999))"
+		fx build -k 0 --log "build.log.$(date +'%Y%m%d%h%m')$((1 + $RANDOM % 99))"
 	else
 		update
 		build
